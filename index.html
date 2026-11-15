@@ -62,7 +62,7 @@ td:first-child,th:first-child{text-align:left;white-space:nowrap}.np{color:var(-
 .pt{font-style:normal;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--line)}
 .p3{background:#E8F8EC;color:#1E8E4E;border-color:#9ADBAF}
 .p1{background:var(--sky);color:var(--blue);border-color:var(--blue)}
-.p0{background:#fff;color:#555}
+.p0{background:#FDECEC;color:#C0392B;border-color:#F3B4AE}
 </style>
 </head>
 <body>
@@ -175,7 +175,7 @@ function draw(){
  else if(S.tab==='win'){const sec=S.wsec||'fans';
   const tog=`<div class="tabs"><button class="${sec==='fans'?'on':''}" onclick="W('fans')">Fans</button><button class="${sec==='vip'?'on':''}" onclick="W('vip')">⭐ VIP</button></div>`;
   const none='<p>Weli ma jiro.</p>',mk=f=>new Date(ms(f.kickoff)).toLocaleString('so',{month:'long',year:'numeric'});
-  h+=tog+`<div class="${sec}"><div class="card"><h2>🏆 Guulaystaha xilliga 2026/27</h2>${winners(sec,f=>'Xilligan')||none}</div><div class="card"><h2>Guulaystayaasha bisha</h2>${winners(sec,mk)||none}</div><div class="card"><h2>Guulaystayaasha todobaadka</h2>${winners(sec,f=>f.week)||none}</div></div>`}
+  h+=tog+`<div class="${sec}"><div class="card"><h2>Guulaystayaasha bisha</h2>${winners(sec,mk)||none}</div><div class="card"><h2>Guulaystayaasha todobaadka</h2>${winners(sec,f=>f.week)||none}</div></div>`}
  else h+=`<div class="card"><h2>👑 Horyaalkii xilligii hore</h2><p>${S.champ?S.champ.name+(S.champ.season?' · '+S.champ.season:''):'Weli lama dhawaaqin.'}</p></div>`;
  if(S.tab!=='vip'&&S.tab!=='fans')S.msg=S.msg;
  A.innerHTML=h+(S.msg&&!['vip','fans'].includes(S.tab)?`<p class="msg">${S.msg}</p>`:'')}
