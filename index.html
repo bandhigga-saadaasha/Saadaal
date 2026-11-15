@@ -75,6 +75,9 @@ import{getFirestore,collection,getDocs,getDoc,doc,writeBatch,Timestamp}from"http
 const app=initializeApp({apiKey:"AIzaSyDBj54IMgA_MPpTHesuRzFXwXGAOJPXzYQ",authDomain:"bandhigga-saadaasha-webb.firebaseapp.com",projectId:"bandhigga-saadaasha-webb",appId:"1:490396598591:web:37e2e2e23c2a01a60c538a"});
 const auth=getAuth(app),db=getFirestore(app);
 const LOCK=90*60*1000;
+// Sawirada VIP-ga (magac -> faylka GitHub). Ku dar mid cusub halkan.
+const PHM={'Abdi':'abdi.jpg','Ahmett97':'ahmeth97.jpg'};
+const ph=p=>p.photo||(p.section==='vip'?PHM[p.name]:'')||'';
 let S={user:null,vip:false,photo:'',fx:[],pr:[],champ:null,tab:'fans',per:'Xilli',mode:'login',msg:'',ok:''};
 const $=id=>document.getElementById(id);
 const ms=t=>t&&t.toMillis?t.toMillis():0;
@@ -98,7 +101,7 @@ function week(){const n=S.fx.find(f=>!f.done);return n?n.week:(S.fx.length?S.fx[
 function stand(sec,per){
  const wk=week(),done=S.fx.filter(f=>f.done),last=done[done.length-1],lm=last?new Date(ms(last.kickoff)).getMonth():-1;
  const F={};done.forEach(f=>{if(per==='Todobaad'&&f.week!==wk)return;if(per==='Bil'&&new Date(ms(f.kickoff)).getMonth()!==lm)return;F[f.id]=f});
- const R={};S.pr.filter(p=>p.section===sec&&F[p.fx]).forEach(p=>{const f=F[p.fx],r=R[p.uid]=R[p.uid]||{n:p.name,ph:p.photo||'',pts:0,pl:0,ex:0,ok:0};
+ const R={};S.pr.filter(p=>p.section===sec&&F[p.fx]).forEach(p=>{const f=F[p.fx],r=R[p.uid]=R[p.uid]||{n:p.name,ph:ph(p),pts:0,pl:0,ex:0,ok:0};
   r.pl++;const e=p.h===f.hs&&p.a===f.as,o=Math.sign(p.h-p.a)===Math.sign(f.hs-f.as);
   if(e){r.pts+=3;r.ex++;r.ok++}else if(o){r.pts++;r.ok++}});
  return Object.values(R).sort((a,b)=>b.pts-a.pts||b.ex-a.ex);
@@ -119,7 +122,7 @@ function pitch(sec){
 function pts(p,f){if(!f.done)return null;if(p.h===f.hs&&p.a===f.as)return 3;return Math.sign(p.h-p.a)===Math.sign(f.hs-f.as)?1:0}
 function board(sec){
  const wk=week(),L=S.fx.filter(f=>f.week===wk),now=Date.now(),U={},PH={};
- S.pr.filter(p=>p.section===sec).forEach(p=>{U[p.uid]=p.name;if(p.photo)PH[p.uid]=p.photo});
+ S.pr.filter(p=>p.section===sec).forEach(p=>{U[p.uid]=p.name;{const x=ph(p);if(x)PH[p.uid]=x}});
  const ids=Object.keys(U).sort((a,b)=>U[a].localeCompare(U[b]));if(!ids.length||!L.length)return'';
  const any=L.some(f=>ms(f.kickoff)-LOCK<=now);
  const cols=`grid-template-columns:210px repeat(${ids.length},104px)`;
@@ -159,7 +162,7 @@ window.AUTH=async()=>{
   else await signInWithEmailAndPassword(auth,e,p);
  }catch(x){S.msg={'auth/invalid-credential':'Gmail ama furaha sirta ah waa khaldan yihiin.','auth/email-already-in-use':'Gmail-kan horey ayaa loo isticmaalay.','auth/weak-password':'Furaha sirta ah waa ugu yaraan 6 xaraf.','auth/invalid-email':'Gmail-ku sax ma aha.'}[x.code]||x.code;draw()}};
 function winners(sec,key){const wk={};S.fx.filter(f=>f.done).forEach(f=>{const k=key(f);(wk[k]=wk[k]||[]).push(f.id)});
- return Object.entries(wk).map(([k,ids])=>{const R={};S.pr.filter(p=>p.section===sec&&ids.includes(p.fx)).forEach(p=>{const f=S.fx.find(x=>x.id===p.fx),r=R[p.uid]=R[p.uid]||{n:p.name,ph:p.photo||'',pts:0,ex:0};
+ return Object.entries(wk).map(([k,ids])=>{const R={};S.pr.filter(p=>p.section===sec&&ids.includes(p.fx)).forEach(p=>{const f=S.fx.find(x=>x.id===p.fx),r=R[p.uid]=R[p.uid]||{n:p.name,ph:ph(p),pts:0,ex:0};
   if(p.h===f.hs&&p.a===f.as){r.pts+=3;r.ex++}else if(Math.sign(p.h-p.a)===Math.sign(f.hs-f.as))r.pts++});
   const t=Object.values(R).sort((a,b)=>b.pts-a.pts||b.ex-a.ex)[0];
   return t?`<div class="row"><div class="av">${t.ph?`<img src="${t.ph}" alt="">`:t.n[0].toUpperCase()}</div><div class="who"><b>${t.n}</b><small>${k}</small></div><div class="pts">${t.pts}</div></div>`:''}).reverse().join('')}
