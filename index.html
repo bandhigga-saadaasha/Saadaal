@@ -76,8 +76,8 @@ const app=initializeApp({apiKey:"AIzaSyDBj54IMgA_MPpTHesuRzFXwXGAOJPXzYQ",authDo
 const auth=getAuth(app),db=getFirestore(app);
 const LOCK=90*60*1000;
 // Sawirada VIP-ga (magac -> faylka GitHub). Ku dar mid cusub halkan.
-const PHM={'Abdi':'abdi.jpg','Ahmett97':'ahmeth97.jpg'};
-const ph=p=>p.photo||(p.section==='vip'?PHM[p.name]:'')||'';
+const PHM={'Abdi':'abdi.jpg','Ahmett97':'Ahmett97.jpg'};
+const ph=p=>(p.section==='vip'&&PHM[p.name])||p.photo||'';
 let S={user:null,vip:false,photo:'',fx:[],pr:[],champ:null,tab:'fans',per:'Xilli',mode:'login',msg:'',ok:''};
 const $=id=>document.getElementById(id);
 const ms=t=>t&&t.toMillis?t.toMillis():0;
