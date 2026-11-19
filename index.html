@@ -78,7 +78,7 @@ const LOCK=90*60*1000;
 // Sawirada VIP-ga (magac -> faylka GitHub). Ku dar mid cusub halkan.
 const PHM={'Abdi':'abdi.jpg','Ahmett97':'Ahmett97.jpg'};
 const ph=p=>(p.section==='vip'&&PHM[p.name])||p.photo||'';
-let S={user:null,vip:false,photo:'',fx:[],pr:[],champ:null,tab:'fans',per:'Xilli',mode:'login',msg:'',ok:''};
+let S={user:null,vip:false,photo:'',seasonDone:false,wper:'Todobaad',fx:[],pr:[],champ:null,tab:'fans',per:'Xilli',mode:'login',msg:'',ok:''};
 const $=id=>document.getElementById(id);
 const ms=t=>t&&t.toMillis?t.toMillis():0;
 const nm=u=>u.displayName||u.email.split('@')[0];
@@ -86,7 +86,7 @@ async function load(){
  try{
   S.fx=(await getDocs(collection(db,'fixtures'))).docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>ms(a.kickoff)-ms(b.kickoff));
   S.pr=(await getDocs(collection(db,'predictions'))).docs.map(d=>d.data());
-  const c=await getDoc(doc(db,'meta','champion'));S.champ=c.exists()?c.data():null;
+  const sd=await getDoc(doc(db,'meta','state'));S.seasonDone=sd.exists()&&sd.data().seasonDone===true;const c=await getDoc(doc(db,'meta','champion'));S.champ=c.exists()?c.data():null;
   const v=await getDoc(doc(db,'vip',S.user.email.toLowerCase()));S.vip=v.exists();S.photo=v.exists()?(v.data().photo||''):'';
  }catch(e){S.msg='Xogta lama soo qaadi karin: '+e.code}
  draw();
@@ -106,7 +106,7 @@ function stand(sec,per){
   if(e){r.pts+=3;r.ex++;r.ok++}else if(o){r.pts++;r.ok++}});
  return Object.values(R).sort((a,b)=>b.pts-a.pts||b.ex-a.ex);
 }
-function rows(L,vip){return L.length?L.map((r,i)=>`<div class="row ${i?'':'f'}"><div class="rk">${i+1}</div><div class="av">${r.ph?`<img src="${r.ph}" alt="">`:r.n[0].toUpperCase()}</div><div class="who"><b>${r.n}</b><small>${r.pl} la saadaaliyay · ${r.ok} sax · ${r.ex} dhamaystiran</small></div><div class="pts">${r.pts}</div></div>`).join(''):'<p class="msg" style="color:var(--mut)">Weli natiijo ma jirto.</p>'}
+function rows(L,w){return L.length?L.map((r,i)=>`<div class="row ${i?'':'f'}"><div class="rk">${i+1}</div><div class="av">${r.ph?`<img src="${r.ph}" alt="">`:r.n[0].toUpperCase()}</div><div class="who"><b>${r.n}${w&&i==0?' <span class="bd">1st</span>':''}</b><small>${r.pl} la saadaaliyay · ${r.ok} sax · ${r.ex} dhamaystiran</small></div><div class="pts">${r.pts}</div></div>`).join(''):'<p class="msg" style="color:var(--mut)">Weli natiijo ma jirto.</p>'}
 function pers(){return`<div class="tabs">${['Todobaad','Bil','Xilli'].map(x=>`<button class="${S.per===x?'on':''}" onclick="P('${x}')">${x}</button>`).join('')}</div>`}
 const cd=(f,s)=>s==='h'?(f.hc||f.home.slice(0,3).toUpperCase()):(f.ac||f.away.slice(0,3).toUpperCase());
 const cr=u=>u?`<img src="${u}" alt="">`:'<span class="ph"></span>';
@@ -167,6 +167,7 @@ function winners(sec,key){const wk={};S.fx.filter(f=>f.done).forEach(f=>{const k
   const t=Object.values(R).sort((a,b)=>b.pts-a.pts||b.ex-a.ex)[0];
   return t?`<div class="row"><div class="av">${t.ph?`<img src="${t.ph}" alt="">`:t.n[0].toUpperCase()}</div><div class="who"><b>${t.n}</b><small>${k}</small></div><div class="pts">${t.pts}</div></div>`:''}).reverse().join('')}
 window.W=k=>{S.wsec=k;draw()};
+window.WP=p=>{S.wper=p;draw()};
 function draw(){
  nav();const A=$('app');
  if(!S.user){A.innerHTML=auth_();return}
@@ -175,10 +176,12 @@ function draw(){
  if(S.tab==='vip'||S.tab==='fans'){const sec=S.tab;
   if(sec==='vip'&&!S.vip)h+='<div class="card"><h2>🔒 VIP</h2><p>Qaybtan waxaa soo geli kara kaliya dadka la doortay.</p></div>';
   else h+=`<div class="${sec}">`+(sec==='fans'&&S.vip?'<div class="card"><h2>⭐ Waxaad tahay VIP</h2><p>Qaybta Fans kuma saadaalin kartid. Ku saadaali tab-ka ⭐ VIP.</p></div>':pitch(sec))+board(sec)+`<div class="card"><h2>Miiska dhibcaha</h2>${pers()}${rows(stand(sec,S.per))}</div></div>`}
- else if(S.tab==='win'){const sec=S.wsec||'fans';
+ else if(S.tab==='win'){const sec=S.wsec||'fans',per=S.wper||'Todobaad';
   const tog=`<div class="tabs"><button class="${sec==='fans'?'on':''}" onclick="W('fans')">Fans</button><button class="${sec==='vip'?'on':''}" onclick="W('vip')">⭐ VIP</button></div>`;
-  const none='<p>Weli ma jiro.</p>',mk=f=>new Date(ms(f.kickoff)).toLocaleString('so',{month:'long',year:'numeric'});
-  h+=tog+`<div class="${sec}"><div class="card"><h2>Guulaystayaasha bisha</h2>${winners(sec,mk)||none}</div><div class="card"><h2>Guulaystayaasha todobaadka</h2>${winners(sec,f=>f.week)||none}</div></div>`}
+  const rg=`<div class="tabs">${['Todobaad','Bil','Xilli'].map(x=>`<button class="${per===x?'on':''}" onclick="WP('${x}')">${x}</button>`).join('')}</div>`;
+  const win=per!=='Xilli'||S.seasonDone;
+  const title={Todobaad:'Guulaystaha todobaadka',Bil:'Guulaystaha bisha',Xilli:'Guulaystaha xilliga'}[per];
+  h+=tog+`<div class="${sec}"><div class="card"><h2>${title}</h2>${rg}${rows(stand(sec,per),win)}${per==='Xilli'&&!S.seasonDone?'<p style="color:var(--mut);font-size:13px">Dhibcuhu waa ku soo ururayaan todobaad kasta. Guulaystaha xilliga waa la ogaanayaa marka horyaalku dhammaado.</p>':''}</div></div>`}
  else h+=`<div class="card"><h2>👑 Horyaalkii xilligii hore</h2><p>${S.champ?S.champ.name+(S.champ.season?' · '+S.champ.season:''):'Weli lama dhawaaqin.'}</p></div>`;
  if(S.tab!=='vip'&&S.tab!=='fans')S.msg=S.msg;
  A.innerHTML=h+(S.msg&&!['vip','fans'].includes(S.tab)?`<p class="msg">${S.msg}</p>`:'')}
