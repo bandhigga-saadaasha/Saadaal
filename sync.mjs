@@ -4,87 +4,92 @@ import {getFirestore,Timestamp} from 'firebase-admin/firestore';
 initializeApp({credential:cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))});
 const db=getFirestore();
 
-const MAX=14, START_GW=1;
-const LEAGUES={'eng.1':'Premier League','esp.1':'La Liga','ita.1':'Serie A','uefa.champions':'Champions League','uefa.europa':'Europa League'};
-const BIG=['arsenal','chelsea','liverpool','manchester city','manchester united','tottenham','newcastle','aston villa','west ham','brighton',
-'barcelona','real madrid','atletico madrid','sevilla','villarreal','athletic club','real sociedad',
-'bayern','dortmund','leverkusen','leipzig','paris saint germain','marseille','monaco',
-'inter','ac milan','juventus','napoli','roma','lazio','atalanta','fiorentina',
-'benfica','porto','sporting cp','ajax','psv','celtic','galatasaray','fenerbahce'];
-const FIX={'Internazionale':'Inter Milan','Atlético Madrid':'Atlético Madrid','Bayern München':'Bayern Munich','AS Roma':'Roma'};
+const TZ=3*3600e3;            // waqtiga Soomaaliya/Itoobiya (GMT+3)
+const day=864e5;
+// Laba kooxood oo kala wakhti: Horyaalada (Sabti 00:00) iyo Champions League (Talaado 00:00)
+const GROUPS=[
+ {id:'league',prefix:'GW',startDow:6,startNo:3,leagues:{
+   'eng.1':{name:'Premier League',must:['arsenal','manchester city','manchester united','liverpool','chelsea','brighton','tottenham']},
+   'ita.1':{name:'Serie A',must:['milan','juventus','inter','roma','napoli','como','lazio','atalanta']},
+   'esp.1':{name:'La Liga',must:['real madrid','barcelona','atletico madrid','real betis']}}},
+ {id:'ucl',prefix:'UCL',startDow:2,startNo:1,leagues:{
+   'uefa.champions':{name:'Champions League',must:['paris saint germain','real madrid','arsenal','liverpool','manchester city','bayern','manchester united','como','inter','atletico madrid']}}}
+];
+const FIX={'Internazionale':'Inter Milan','Bayern München':'Bayern Munich','AS Roma':'Roma'};
 const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/-/g,' ');
-const TOP=['arsenal','chelsea','liverpool','manchester city','manchester united','tottenham','barcelona','real madrid','atletico madrid','bayern','paris saint germain','inter','ac milan','juventus','napoli','dortmund','leverkusen'];
-const isBig=n=>BIG.some(b=>norm(n).includes(b));
-const sc=n=>TOP.some(b=>norm(n).includes(b))?3:(isBig(n)?1:0);
 const fix=n=>FIX[n]||n;
-
-const day=864e5, now=new Date();
-// Todobaadka waa Jimce 00:00 ilaa Khamiis (UTC)
-const dow=now.getUTCDay();
-const start=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()-((dow-5+7)%7));
-const end=start+7*day;
 const ymd=t=>new Date(t).toISOString().slice(0,10).replace(/-/g,'');
 
-const stRef=db.doc('meta/state');
-const st=(await stRef.get()).data()||{};
-const gwStart=st.gwStart||start, startGw=st.startGw??START_GW;
-if(!st.gwStart)await stRef.set({gwStart,startGw},{merge:true});
-const week='GW'+(startGw+Math.round((start-gwStart)/(7*day)));
-
-const all=new Map();
-let okLeagues=0;
 async function getEvents(slug,dates){
   const url=`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/scoreboard?dates=${dates}`;
   const r=await fetch(url,{headers:{'user-agent':'Mozilla/5.0','accept':'application/json'}});
   if(!r.ok){const t=(await r.text()).slice(0,150);throw new Error('HTTP '+r.status+' '+dates+' '+t)}
   return (await r.json()).events||[];
 }
-function add(e,name){
-  const c=e.competitions?.[0];if(!c)return;
+function parse(e){
+  const c=e.competitions?.[0];if(!c)return null;
   const h=c.competitors.find(x=>x.homeAway==='home'),a=c.competitors.find(x=>x.homeAway==='away');
-  if(!h||!a)return;
-  all.set(String(e.id),{id:String(e.id),home:fix(h.team.displayName),away:fix(a.team.displayName),
+  if(!h||!a)return null;
+  return {id:String(e.id),home:fix(h.team.displayName),away:fix(a.team.displayName),
     homeCrest:h.team.logo||'',awayCrest:a.team.logo||'',hc:h.team.abbreviation||'',ac:a.team.abbreviation||'',
-    league:name,ms:new Date(e.date).getTime(),done:e.status?.type?.completed===true,
-    hs:parseInt(h.score),as:parseInt(a.score)});
+    ms:new Date(e.date).getTime(),done:e.status?.type?.completed===true,hs:parseInt(h.score),as:parseInt(a.score)};
 }
-let errs=0;
-for(const [slug,name] of Object.entries(LEAGUES)){
-  let n=0,ok=0;
-  for(let t=start-2*day;t<end;t+=day){
-    try{const ev=await getEvents(slug,ymd(t));ev.forEach(e=>add(e,name));n+=ev.length;ok++}
-    catch(e2){errs++;console.log(name,ymd(t),e2.message)}
+// bilowga todobaadka (00:00 GMT+3) ee maalinta startDow
+function windowStart(startDow){
+  const loc=new Date(Date.now()+TZ),back=(loc.getUTCDay()-startDow+7)%7;
+  return Date.UTC(loc.getUTCFullYear(),loc.getUTCMonth(),loc.getUTCDate()-back)-TZ;
+}
+
+const stRef=db.doc('meta/state');
+const st=(await stRef.get()).data()||{};
+const gs=st.groups||{};
+const known=new Map();   // dhammaan ciyaaraha la helay (natiijooyinka)
+let errs=0,okAny=0;
+
+for(const g of GROUPS){
+  const start=windowStart(g.startDow),end=start+7*day;
+  if(!gs[g.id]){gs[g.id]={anchor:start,startNo:g.startNo};await stRef.set({groups:{[g.id]:gs[g.id]}},{merge:true})}
+  const week=g.prefix+(gs[g.id].startNo+Math.round((start-gs[g.id].anchor)/(7*day)));
+  const cand=[];
+  for(const [slug,L] of Object.entries(g.leagues)){
+    let n=0,ok=0;
+    for(let t=start-2*day;t<=end;t+=day){
+      try{
+        const ev=await getEvents(slug,ymd(t));ok++;
+        for(const e of ev){
+          const f=parse(e);if(!f)continue;
+          f.league=L.name;known.set(f.id,f);n++;
+          const inWin=f.ms>=start&&f.ms<end;
+          const must=L.must.some(m=>norm(f.home).includes(m)||norm(f.away).includes(m));
+          if(inWin&&must&&!cand.find(c=>c.id===f.id))cand.push(f);
+        }
+      }catch(err){errs++;console.log(L.name,ymd(t),err.message)}
+    }
+    if(ok)okAny++;
+    console.log(g.id,L.name,'events:',n,'maalmo:',ok);
   }
-  if(ok)okLeagues++;
-  console.log(name,'events:',n,'maalmo oo guuleystay:',ok);
+  const ex=new Set((await db.collection('fixtures').where('week','==',week).get()).docs.map(d=>d.id));
+  for(const c of cand){
+    const base={home:c.home,away:c.away,homeCrest:c.homeCrest,awayCrest:c.awayCrest,hc:c.hc,ac:c.ac,
+      league:c.league,group:g.id,kickoff:Timestamp.fromMillis(c.ms),week};
+    if(!ex.has(c.id))Object.assign(base,{done:false,hs:null,as:null});
+    await db.doc('fixtures/'+c.id).set(base,{merge:true});
+  }
+  console.log(g.id,week,'- ciyaaro la kaydiyay:',cand.length);
 }
-if(!okLeagues)throw new Error('Ma jiro horyaal la soo qaadi karay');
+if(!okAny)throw new Error('Ma jiro horyaal la soo qaadi karay');
 
-// 1) Ciyaaraha todobaadkan (kooxaha waaweyn)
-const cand=[...all.values()].filter(f=>f.ms>=start&&f.ms<end)
-  .map(f=>({...f,n:sc(f.home)+sc(f.away)})).filter(f=>f.n>=3);
-cand.sort((a,b)=>b.n-a.n||a.ms-b.ms);
-const ex=(await db.collection('fixtures').where('week','==',week).get()).docs.map(d=>d.id);
-const predicted=new Set((await db.collection('predictions').where('week','==',week).get()).docs.map(d=>d.data().fx));
-// Kuwa hore loo saadaaliyay ama bilaabmay waa la hayaa; kuwa kale waa la dib-doortaa
-const keep=ex.filter(id=>predicted.has(id)||(all.get(id)&&all.get(id).ms<Date.now()));
-const pick=cand.filter(c=>keep.includes(c.id));
-for(const c of cand){if(pick.length>=MAX)break;if(!pick.includes(c))pick.push(c)}
-const ids=pick.map(c=>c.id);
-if(!errs)for(const id of ex){if(!ids.includes(id)&&!keep.includes(id))await db.doc('fixtures/'+id).delete()}
-for(const c of pick){
-  const base={home:c.home,away:c.away,homeCrest:c.homeCrest,awayCrest:c.awayCrest,hc:c.hc,ac:c.ac,
-    league:c.league,kickoff:Timestamp.fromMillis(c.ms),week};
-  if(!ex.includes(c.id))Object.assign(base,{done:false,hs:null,as:null});
-  await db.doc('fixtures/'+c.id).set(base,{merge:true});
-}
-console.log(week,'- ciyaaro la kaydiyay:',pick.length);
-
-// 2) Natiijooyinka
+// Natiijooyinka
 const open=(await db.collection('fixtures').where('done','==',false).get()).docs;
 let fin=0;
 for(const d of open){
-  const f=all.get(d.id);
+  const f=known.get(d.id);
   if(f&&f.done&&Number.isFinite(f.hs)&&Number.isFinite(f.as)){await d.ref.update({done:true,hs:f.hs,as:f.as});fin++}
 }
 console.log('natiijooyin la dhammeeyay:',fin);
+
+// Liiska VIP (magacyo + sawirro) si Fans looga saaro VIP-ga
+const names=[],photos={};
+(await db.collection('vip').get()).docs.forEach(d=>{const x=d.data();if(x.name){names.push(x.name);if(x.photo)photos[x.name]=x.photo}});
+await db.doc('meta/vip').set({names,photos,updated:Timestamp.now()});
+console.log('VIP:',names.length);
