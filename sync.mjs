@@ -79,6 +79,12 @@ for(const g of GROUPS){
 }
 if(!okAny)throw new Error('Ma jiro horyaal la soo qaadi karay');
 
+// Nadiifi ciyaaraha hore ee la doortay habka hore (aan lahayn 'group') ee aan weli dhicin
+for(const d of (await db.collection('fixtures').where('done','==',false).get()).docs){
+  const x=d.data();
+  if(!x.group&&x.kickoff.toMillis()>Date.now()){await d.ref.delete();console.log('la tirtiray ciyaar hore:',d.id)}
+}
+
 // Natiijooyinka
 const open=(await db.collection('fixtures').where('done','==',false).get()).docs;
 let fin=0;

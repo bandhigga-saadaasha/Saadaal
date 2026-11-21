@@ -78,6 +78,7 @@ const LOCK=90*60*1000;
 // Sawirada VIP-ga (magac -> faylka GitHub). Ku dar mid cusub halkan.
 const PHM={'Abdi':'abdi.jpg','Ahmett97':'Ahmett97.jpg'};
 const ph=p=>(p.section==='vip'&&(S.vm.photos[p.name]||PHM[p.name]))||p.photo||'';
+const grp=f=>f.group||(f.league==='Champions League'?'ucl':'league');
 const PR=()=>S.pr.filter(p=>!(p.section==='fans'&&S.vm.names.includes(p.name)));
 let S={user:null,vip:false,photo:'',seasonDone:false,wper:'Todobaad',vm:{names:[],photos:{}},fx:[],pr:[],champ:null,tab:'fans',per:'Xilli',mode:'login',msg:'',ok:''};
 const $=id=>document.getElementById(id);
@@ -98,7 +99,7 @@ function nav(){const t=[['fans','Fans'],['vip','⭐ VIP'],['win','Guulaystayaash
 window.T=k=>{S.tab=k;S.msg='';S.ok='';draw()};
 window.P=p=>{S.per=p;draw()};
 window.M=m=>{S.mode=m;S.msg='';draw()};
-function wkOf(g){const L=S.fx.filter(f=>(f.group||'league')===g);const n=L.find(f=>!f.done);return n?n.week:(L.length?L[L.length-1].week:null)}
+function wkOf(g){const L=S.fx.filter(f=>grp(f)===g);const n=L.find(f=>!f.done);return n?n.week:(L.length?L[L.length-1].week:null)}
 function curWeeks(){return ['league','ucl'].map(wkOf).filter(Boolean)}
 function stand(sec,per){
  const cw=curWeeks(),done=S.fx.filter(f=>f.done),last=done[done.length-1],lm=last?new Date(ms(last.kickoff)).getMonth():-1;
@@ -118,7 +119,7 @@ function pitch(sec){
  const now=Date.now(),mine={};S.pr.filter(p=>p.uid===S.user.uid&&p.section===sec).forEach(p=>mine[p.fx]=p);
  let out='',open=false,any=false;
  for(const [g,title] of [['league','Horyaalada'],['ucl','Champions League']]){
-  const wk=wkOf(g),L=wk?S.fx.filter(f=>(f.group||'league')===g&&f.week===wk):[];
+  const wk=wkOf(g),L=wk?S.fx.filter(f=>grp(f)===g&&f.week===wk):[];
   if(!L.length)continue;any=true;
   const o=L.some(f=>!mine[f.id]&&ms(f.kickoff)-LOCK>now);if(o)open=true;
   out+=`<div class="top"><h2 style="margin:0">${title}</h2><span class="bd">${wk} · ${o?'furan':'xiran'}</span></div>`+L.map((f,i)=>mcard(f,i,mine,now)).join('');
@@ -128,7 +129,7 @@ function pitch(sec){
  `<p class="msg">${S.msg}</p><p class="msg ok">${S.ok}</p>${open?`<button class="btn ${sec==='vip'?'v':''}" onclick="SUB('${sec}')">Submit saadaalinta</button><p style="font-size:13px;color:var(--mut)">Marka aad Submit taabato, mar dambe lama beddeli karo. Dadka kale oo dhan way arki karaan saadaalintaada.</p>`:''}`}
 function pts(p,f){if(!f.done)return null;if(p.h===f.hs&&p.a===f.as)return 3;return Math.sign(p.h-p.a)===Math.sign(f.hs-f.as)?1:0}
 function boardG(sec,g,title){
- const wk=wkOf(g),L=wk?S.fx.filter(f=>(f.group||'league')===g&&f.week===wk):[];
+ const wk=wkOf(g),L=wk?S.fx.filter(f=>grp(f)===g&&f.week===wk):[];
  if(!L.length)return'';
  const preds=PR().filter(p=>p.section===sec&&L.some(f=>f.id===p.fx)),U={},PH={};
  preds.forEach(p=>{U[p.uid]=p.name;const x=ph(p);if(x)PH[p.uid]=x});
